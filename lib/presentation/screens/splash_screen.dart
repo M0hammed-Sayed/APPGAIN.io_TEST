@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/theme/app_theme.dart';
 import 'movies_screen.dart';
-
+import 'package:go_router/go_router.dart';
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
 
@@ -79,12 +79,9 @@ class _SplashScreenState extends State<SplashScreen>
     await _exitController.forward();
 
     if (!mounted) return;
-    Navigator.of(context).pushReplacement(
-      PageRouteBuilder(
-        pageBuilder: (_, __, ___) => const MoviesScreen(),
-        transitionDuration: Duration.zero,
-      ),
-    );
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) context.go('/movies');
+    });
   }
 
   @override

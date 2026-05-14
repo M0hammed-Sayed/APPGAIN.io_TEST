@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter/services.dart';
+import 'package:go_router/go_router.dart';
+
 import '../../core/constants/app_constants.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/responsive.dart';
@@ -10,7 +13,6 @@ import '../../domain/usecases/movie_usecases.dart';
 import '../cubits/details/details_cubit.dart';
 import '../cubits/details/details_state.dart';
 
-/// Creates its own [DetailsCubit] so the movies list state is never touched.
 class MovieDetailsScreen extends StatelessWidget {
   final int movieId;
 
@@ -31,6 +33,7 @@ class MovieDetailsScreen extends StatelessWidget {
 
 class _DetailsView extends StatelessWidget {
   final int movieId;
+
   const _DetailsView({required this.movieId});
 
   @override
@@ -47,27 +50,17 @@ class _DetailsView extends StatelessWidget {
             );
           }
 
-          if (state is DetailsLoaded) {
-            return _DetailsContent(movie: state.movie, r: r);
-          }
-
           if (state is DetailsError) {
             return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.error_outline,
-                      color: AppTheme.primary, size: r.w(48)),
-                  SizedBox(height: r.h(12)),
-                  Text(
-                    state.message,
-                    style: TextStyle(
-                        color: AppTheme.textMuted, fontSize: r.sp(14)),
-                    textAlign: TextAlign.center,
-                  ),
-                ],
+              child: Text(
+                state.message,
+                style: const TextStyle(color: Colors.white),
               ),
             );
+          }
+
+          if (state is DetailsLoaded) {
+            return _DetailsContent(movie: state.movie, r: r);
           }
 
           return const SizedBox();
@@ -81,13 +74,18 @@ class _DetailsContent extends StatelessWidget {
   final MovieDetailsEntity movie;
   final Responsive r;
 
-  const _DetailsContent({required this.movie, required this.r});
+  const _DetailsContent({
+    super.key,
+    required this.movie,
+    required this.r,
+  });
 
   @override
   Widget build(BuildContext context) {
     final backdropUrl = movie.backdropPath != null
         ? '${AppConstants.backdropBaseUrl}${movie.backdropPath}'
         : null;
+
     final imageUrl = movie.posterPath != null
         ? '${AppConstants.imageBaseUrl}${movie.posterPath}'
         : null;
@@ -97,38 +95,32 @@ class _DetailsContent extends StatelessWidget {
 
     return CustomScrollView(
       slivers: [
-        // Backdrop + back
         SliverAppBar(
           expandedHeight: r.h(240),
           backgroundColor: AppTheme.background,
           leading: GestureDetector(
-            onTap: () => Navigator.pop(context),
+            onTap: () => context.pop(),
             child: Container(
               margin: EdgeInsets.all(r.w(8)),
               decoration: BoxDecoration(
                 color: Colors.black54,
                 borderRadius: BorderRadius.circular(r.w(10)),
               ),
-              child: Icon(Icons.arrow_back_ios_new,
-                  color: Colors.white, size: r.sp(18)),
+              child: Icon(
+                Icons.arrow_back_ios_new,
+                color: Colors.white,
+                size: r.sp(18),
+              ),
             ),
           ),
           flexibleSpace: FlexibleSpaceBar(
             background: backdropUrl != null
-                ? ShaderMask(
-                    shaderCallback: (rect) => const LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [Colors.transparent, AppTheme.background],
-                    ).createShader(rect),
-                    blendMode: BlendMode.darken,
-                    child: Image.network(
-                      backdropUrl,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) =>
-                          Container(color: AppTheme.surface),
-                    ),
-                  )
+                ? Image.network(
+              backdropUrl,
+              fit: BoxFit.cover,
+              errorBuilder: (_, __, ___) =>
+                  Container(color: AppTheme.surface),
+            )
                 : Container(color: AppTheme.surface),
           ),
         ),
@@ -142,27 +134,28 @@ class _DetailsContent extends StatelessWidget {
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Poster
                     ClipRRect(
                       borderRadius: BorderRadius.circular(r.w(12)),
                       child: imageUrl != null
                           ? Image.network(
-                              imageUrl,
-                              width: posterW,
-                              height: posterH,
-                              fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) =>
-                                  _posterPlaceholder(r, posterW, posterH),
-                            )
-                          : _posterPlaceholder(r, posterW, posterH),
+                        imageUrl,
+                        width: posterW,
+                        height: posterH,
+                        fit: BoxFit.cover,
+                      )
+                          : Container(
+                        width: posterW,
+                        height: posterH,
+                        color: AppTheme.surfaceVariant,
+                        child: const Icon(Icons.movie),
+                      ),
                     ),
                     SizedBox(width: r.w(16)),
-                    // Info
+
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          SizedBox(height: r.h(8)),
                           Text(
                             movie.title,
                             style: TextStyle(
@@ -172,38 +165,11 @@ class _DetailsContent extends StatelessWidget {
                             ),
                           ),
                           SizedBox(height: r.h(8)),
-                          Row(
-                            children: [
-                              Icon(Icons.star_rounded,
-                                  color: AppTheme.gold, size: r.sp(18)),
-                              SizedBox(width: r.w(4)),
-                              Text(
-                                '${movie.voteAverage.toStringAsFixed(1)} / 10',
-                                style: TextStyle(
-                                  color: AppTheme.textPrimary,
-                                  fontWeight: FontWeight.w600,
-                                  fontSize: r.sp(14),
-                                ),
-                              ),
-                            ],
-                          ),
-                          SizedBox(height: r.h(8)),
-                          Wrap(
-                            spacing: r.w(8),
-                            runSpacing: r.h(6),
-                            children: [
-                              if (movie.releaseYear.isNotEmpty)
-                                _chip(r, movie.releaseYear),
-                              if (movie.runtime != null)
-                                _chip(r, '${movie.runtime}m'),
-                            ],
-                          ),
-                          SizedBox(height: r.h(10)),
-                          Wrap(
-                            spacing: r.w(6),
-                            runSpacing: r.h(6),
-                            children:
-                                movie.genres.map((g) => _genreChip(r, g)).toList(),
+                          Text(
+                            '${movie.voteAverage.toStringAsFixed(1)} / 10',
+                            style: TextStyle(
+                              color: AppTheme.textSecondary,
+                            ),
                           ),
                         ],
                       ),
@@ -211,7 +177,7 @@ class _DetailsContent extends StatelessWidget {
                   ],
                 ),
 
-                SizedBox(height: r.h(28)),
+                SizedBox(height: r.h(25)),
 
                 Text(
                   'OVERVIEW',
@@ -222,7 +188,9 @@ class _DetailsContent extends StatelessWidget {
                     letterSpacing: 2,
                   ),
                 ),
+
                 SizedBox(height: r.h(10)),
+
                 Text(
                   movie.overview,
                   style: TextStyle(
@@ -231,6 +199,55 @@ class _DetailsContent extends StatelessWidget {
                     height: 1.6,
                   ),
                 ),
+
+                SizedBox(height: r.h(30)),
+
+                // ✅ COPY LINK BUTTON
+                Center(
+                  child: GestureDetector(
+                    onTap: () {
+                      final link = 'cinescope://details/${movie.id}';
+
+                      Clipboard.setData(ClipboardData(text: link));
+
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Link copied!'),
+                        ),
+                      );
+                    },
+                    child: Container(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: r.w(24),
+                        vertical: r.h(12),
+                      ),
+                      decoration: BoxDecoration(
+                        border: Border.all(color: AppTheme.primary),
+                        borderRadius: BorderRadius.circular(r.w(12)),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.link,
+                            color: AppTheme.primary,
+                            size: r.sp(18),
+                          ),
+                          SizedBox(width: r.w(8)),
+                          Text(
+                            'Copy Link',
+                            style: TextStyle(
+                              color: AppTheme.primary,
+                              fontSize: r.sp(14),
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+
                 SizedBox(height: r.h(40)),
               ],
             ),
@@ -239,43 +256,4 @@ class _DetailsContent extends StatelessWidget {
       ],
     );
   }
-
-  Widget _chip(Responsive r, String label) => Container(
-        padding: EdgeInsets.symmetric(horizontal: r.w(10), vertical: r.h(4)),
-        decoration: BoxDecoration(
-          color: AppTheme.surfaceVariant,
-          borderRadius: BorderRadius.circular(r.w(8)),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-              color: AppTheme.textSecondary, fontSize: r.sp(12)),
-        ),
-      );
-
-  Widget _genreChip(Responsive r, String label) => Container(
-        padding: EdgeInsets.symmetric(horizontal: r.w(10), vertical: r.h(4)),
-        decoration: BoxDecoration(
-          border: Border.all(color: AppTheme.primary.withOpacity(0.6)),
-          borderRadius: BorderRadius.circular(r.w(20)),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            color: AppTheme.primary,
-            fontSize: r.sp(11),
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-      );
-
-  Widget _posterPlaceholder(Responsive r, double w, double h) => Container(
-        width: w,
-        height: h,
-        decoration: BoxDecoration(
-          color: AppTheme.surfaceVariant,
-          borderRadius: BorderRadius.circular(r.w(12)),
-        ),
-        child: Icon(Icons.movie, color: Colors.white24, size: r.sp(40)),
-      );
 }
